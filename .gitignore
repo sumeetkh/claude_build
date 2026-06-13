@@ -1,0 +1,13 @@
+# Node / frontend
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Python / backend
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
