@@ -36,3 +36,47 @@ def test_session_lifecycle_with_action_and_advance():
 def test_unknown_scenario_is_404():
     r = client.post("/api/sessions", json={"scenario_id": "nope"})
     assert r.status_code == 404
+
+
+def _authored_scenario(sid: str) -> dict:
+    led = {"color": "green", "behavior": {"mode": "solid", "count": None}}
+    off = {"color": "off", "behavior": {"mode": "solid", "count": None}}
+    panel = {"pwr": led, "net": led, "wifi": off, "lan": led, "stat": off, "glyph": ""}
+    return {
+        "id": sid, "name": "Authored", "description": "", "root_cause": "",
+        "initial_state": "a",
+        "states": [
+            {"id": "a", "name": "wifi off", "panel": panel, "signal_class": "fault"},
+            {"id": "b", "name": "ok", "panel": {**panel, "wifi": led}, "signal_class": "nominal"},
+        ],
+        "transitions": [
+            {"from_state": "a", "to_state": "b", "trigger": {"kind": "action", "action": "toggle_wifi"}, "weight": 1.0},
+        ],
+    }
+
+
+def test_author_a_scenario_then_play_it():
+    s = _authored_scenario("authored_wifi")
+    r = client.post("/api/scenarios", json=s)
+    assert r.status_code == 201
+
+    # It shows up in the catalog and can be run like any other.
+    assert "authored_wifi" in {x["id"] for x in client.get("/api/scenarios").json()}
+
+    sid = client.post("/api/sessions", json={"scenario_id": "authored_wifi"}).json()["session_id"]
+    r = client.post(f"/api/sessions/{sid}/actions", json={"action": "toggle_wifi"})
+    assert r.json()["applied"] is True
+    assert r.json()["session"]["state_id"] == "b"
+
+    assert client.delete("/api/scenarios/authored_wifi").status_code == 204
+
+
+def test_duplicate_id_conflicts_and_seed_is_protected():
+    assert client.post("/api/scenarios", json=_authored_scenario("nominal")).status_code == 409
+    assert client.delete("/api/scenarios/nominal").status_code == 409
+
+
+def test_invalid_scenario_rejected():
+    bad = _authored_scenario("bad_ref")
+    bad["initial_state"] = "ghost"  # not a defined state
+    assert client.post("/api/scenarios", json=bad).status_code == 422

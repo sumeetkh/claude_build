@@ -1,15 +1,27 @@
+import { useEffect, useState } from 'react'
+import * as api from '../api'
 import {
   agents,
-  scenarios,
   sessions,
   agentById,
   scenarioById,
   type Session,
 } from '../data/mock'
+import type { ScenarioSummary } from '../types'
 
-type Props = { onOpenSession: (session: Session) => void }
+type Props = {
+  onOpenSession: (session: Session) => void
+  onOpenScenario: (id: string | null) => void
+}
 
-export default function HomeView({ onOpenSession }: Props) {
+export default function HomeView({ onOpenSession, onOpenScenario }: Props) {
+  const [scenarios, setScenarios] = useState<ScenarioSummary[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.listScenarios().then(setScenarios).catch((e) => setError(String(e)))
+  }, [])
+
   return (
     <div className="home">
       <header className="home-top">
@@ -59,16 +71,17 @@ export default function HomeView({ onOpenSession }: Props) {
           </div>
         </Section>
 
-        <Section title="Scenarios" action="+ New Scenario">
+        <Section title="Scenarios" action="+ New Scenario" onAction={() => onOpenScenario(null)}>
+          {error && <div className="card-desc" style={{ color: 'var(--red)' }}>Backend offline? {error}</div>}
           <div className="card-row">
             {scenarios.map((s) => (
-              <div key={s.id} className="card lib-card">
+              <button key={s.id} className="card session-card" onClick={() => onOpenScenario(s.id)}>
                 <div className="card-head">
                   <span className="card-title">{s.name}</span>
-                  <span className="chip">{s.code}</span>
+                  <span className="chip">{s.num_states}st · {s.num_transitions}tr</span>
                 </div>
-                <div className="card-desc">{s.summary}</div>
-              </div>
+                <div className="card-desc">{s.description}</div>
+              </button>
             ))}
           </div>
         </Section>
@@ -80,17 +93,19 @@ export default function HomeView({ onOpenSession }: Props) {
 function Section({
   title,
   action,
+  onAction,
   children,
 }: {
   title: string
   action: string
+  onAction?: () => void
   children: React.ReactNode
 }) {
   return (
     <section className="section">
       <div className="section-head">
         <h2>{title}</h2>
-        <button className="ghost-btn">{action}</button>
+        <button className="ghost-btn" onClick={onAction}>{action}</button>
       </div>
       {children}
     </section>

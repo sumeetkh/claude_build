@@ -13,7 +13,12 @@ from pydantic import BaseModel, Field
 
 from .engine import DeviceRuntime, TransitionEvent
 from .models import Action, PanelState, Scenario, SignalClass
-from .scenarios import list_scenarios
+from .scenarios import (
+    create_scenario,
+    delete_scenario,
+    list_scenarios,
+    update_scenario,
+)
 from .store import SessionStore
 
 app = FastAPI(title="Meridian R7 Simulator", version="0.1.0")
@@ -100,6 +105,34 @@ def get_scenario_detail(scenario_id: str) -> Scenario:
         if s.id == scenario_id:
             return s
     raise HTTPException(404, f"no scenario {scenario_id!r}")
+
+
+@app.post("/api/scenarios", response_model=Scenario, status_code=201)
+def post_scenario(scenario: Scenario) -> Scenario:
+    try:
+        return create_scenario(scenario)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.put("/api/scenarios/{scenario_id}", response_model=Scenario)
+def put_scenario(scenario_id: str, scenario: Scenario) -> Scenario:
+    if scenario.id != scenario_id:
+        raise HTTPException(400, "scenario id in body must match the path")
+    try:
+        return update_scenario(scenario_id, scenario)
+    except KeyError:
+        raise HTTPException(404, f"no scenario {scenario_id!r}")
+
+
+@app.delete("/api/scenarios/{scenario_id}", status_code=204)
+def remove_scenario(scenario_id: str) -> None:
+    try:
+        delete_scenario(scenario_id)
+    except KeyError:
+        raise HTTPException(404, f"no scenario {scenario_id!r}")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
 
 
 # -- sessions --------------------------------------------------------------

@@ -192,12 +192,38 @@ _SCENARIOS: list[Scenario] = [
     ),
 ]
 
+# In-memory registry, seeded from the catalog and mutable so the editor can
+# author new scenarios. Insertion order is preserved for stable listing.
+# (Not persisted across restarts - a JSON-file backing can be added later.)
 REGISTRY: dict[str, Scenario] = {s.id: s for s in _SCENARIOS}
+SEED_IDS: frozenset[str] = frozenset(REGISTRY)
 
 
 def list_scenarios() -> list[Scenario]:
-    return list(_SCENARIOS)
+    return list(REGISTRY.values())
 
 
 def get_scenario(scenario_id: str) -> Scenario:
     return REGISTRY[scenario_id]
+
+
+def create_scenario(scenario: Scenario) -> Scenario:
+    if scenario.id in REGISTRY:
+        raise ValueError(f"scenario {scenario.id!r} already exists")
+    REGISTRY[scenario.id] = scenario
+    return scenario
+
+
+def update_scenario(scenario_id: str, scenario: Scenario) -> Scenario:
+    if scenario_id not in REGISTRY:
+        raise KeyError(scenario_id)
+    REGISTRY[scenario_id] = scenario
+    return scenario
+
+
+def delete_scenario(scenario_id: str) -> None:
+    if scenario_id not in REGISTRY:
+        raise KeyError(scenario_id)
+    if scenario_id in SEED_IDS:
+        raise ValueError(f"cannot delete seed scenario {scenario_id!r}")
+    del REGISTRY[scenario_id]
